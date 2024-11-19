@@ -36,14 +36,24 @@ func (rp *ReverseProxy) ReverseProxy(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		// Логируем запросы
+		fmt.Printf("Proxying request: %s %s -> %s\n", r.Method, r.URL.Path, uri.String())
+
 		r.Header.Set("Reverse-Proxy", "true")
 
-		proxy := httputil.ReverseProxy{Director: func(r *http.Request) {
-			r.URL.Scheme = uri.Scheme
-			r.URL.Host = uri.Host
-			r.URL.Path = uri.Path + r.URL.Path
-			r.Host = uri.Host
-		}}
+		proxy := httputil.ReverseProxy{
+			Director: func(r *http.Request) {
+				r.URL.Scheme = uri.Scheme
+				r.URL.Host = uri.Host
+				r.URL.Path = uri.Path + r.URL.Path
+				r.Host = uri.Host
+			},
+			// Добавляем отлавливание ошибки проксирования
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				http.Error(w, "Proxy error: "+err.Error(), http.StatusBadGateway)
+			},
+		}
 
 		proxy.ServeHTTP(w, r)
 	})
